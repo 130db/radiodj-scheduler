@@ -1,5 +1,5 @@
 -- =====================================================================
--- Custom scheduler — full teardown
+-- Custom scheduler - full teardown
 -- Pair of scheduler-create.sql. Regenerated 2026-08-31.
 --
 -- The previous version failed on its first statement: it dropped
@@ -11,7 +11,7 @@
 -- Order here is deliberate and no FOREIGN_KEY_CHECKS override is used:
 -- events before the procedures they call, children before parents,
 -- clocks_list before both clocks and the subcategory columns it
--- references. If a statement errors, the order is wrong — fix the
+-- references. If a statement errors, the order is wrong - fix the
 -- order, do not disable the checks.
 --
 -- THIS DELETES YOUR CLOCKS, YOUR SCHEDULE AND YOUR LOG. Back up first:
@@ -56,13 +56,13 @@ DROP FUNCTION IF EXISTS `ClockGridDow`;
 -- clocks_list holds FKs to clocks and to subcategory, so it goes
 -- before both the clocks drop and the subcategory ALTER below.
 -- clocks_list, its trigger, its build procedures and its 23:20 event
--- were removed by the release that removed the template table — ScheduleBuildSkeleton resolves the
+-- were removed by the release that removed the template table - ScheduleBuildSkeleton resolves the
 -- grid directly now. The drops above cover a station still on 019.
 --
 -- The grid tables go before `clocks`: clock_grid_hours and
 -- clock_overrides both carry a foreign key to it, and MySQL refuses to
 -- drop a parent whose children still reference it (errno 3730). Within
--- the grid, children before parents for the same reason —
+-- the grid, children before parents for the same reason -
 -- clock_grid_rotation_entries references both a rotation and a grid.
 DROP TABLE IF EXISTS `clock_overrides`;
 DROP TABLE IF EXISTS `clock_grid_rotation_entries`;
@@ -106,7 +106,7 @@ ALTER TABLE `subcategory`
 
 
 -- =====================================================================
--- VERIFY — all three should return zero rows
+-- VERIFY - all three should return zero rows
 -- =====================================================================
 SELECT TABLE_NAME FROM information_schema.TABLES
 WHERE TABLE_SCHEMA = DATABASE()

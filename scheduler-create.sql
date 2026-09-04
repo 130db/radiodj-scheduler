@@ -1,5 +1,5 @@
 -- =====================================================================
--- Custom scheduler — full baseline
+-- Custom scheduler - full baseline
 -- RadioDJ 3.0.0.2 / MySQL 8.0.x / any station
 --
 -- Regenerated 2026-08-31 from the migration chain 002-014, all of
@@ -29,7 +29,7 @@
 --   database. This file is not that. Do not make it re-runnable.
 --
 -- Keep the two roles separate. Do NOT add DROP statements here to make
--- it re-runnable — that is the migrations' job, and blurring it makes
+-- it re-runnable - that is the migrations' job, and blurring it makes
 -- a full install silently destructive. Do NOT generate a migration by
 -- copying bodies out of this file without adding the DROPs back: that
 -- is exactly how 011 shipped broken.
@@ -53,7 +53,7 @@ SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 -- RadioDJ deleting a subcategory can never be blocked by us.
 ALTER TABLE `subcategory`
 -- THE DEFAULT IS LOAD-BEARING. average_runtime, fill_priority and
--- fallback_subcategory_id are all OURS, not RadioDJ's — the stock
+-- fallback_subcategory_id are all OURS, not RadioDJ's - the stock
 -- `subcategory` table has only ID, parentid, name and sweeper_subID.
 -- RadioDJ therefore knows nothing about this column and does not
 -- supply it when you add a subcategory in its UI. Without a default,
@@ -61,7 +61,7 @@ ALTER TABLE `subcategory`
 --     ERROR 1364 Field 'average_runtime' doesn't have a default value
 --
 -- AND RADIODJ SWALLOWS THE ERROR. It shows no message. You click "add
--- subcategory", nothing appears, and nothing tells you why — you would
+-- subcategory", nothing appears, and nothing tells you why - you would
 -- be looking for a bug in RadioDJ, in a column RadioDJ has never heard
 -- of. Same reason fill_priority carries a default. NEVER REMOVE EITHER.
 ADD COLUMN `average_runtime` decimal(11,5) unsigned NOT NULL DEFAULT 0.00000,
@@ -75,7 +75,7 @@ ADD CONSTRAINT `FK_subcategory_fallback`
 -- RadioDJ ships idx_artist_title (artist, title) on `songs`, so the
 -- ARTIST separation subquery can look same-artist tracks up directly.
 -- Nothing leads on title, so the optimiser inverted the TITLE subquery
--- into a scan of the whole schedule window per candidate — 116 ms of a
+-- into a scan of the whole schedule window per candidate - 116 ms of a
 -- 120 ms slot, and the single biggest cost in a day build. This makes
 -- the two paths symmetrical. Additive to RadioDJ's own schema and
 -- untouched by its upgrades; removed again by the teardown script.
@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS `schedule` (
   UNIQUE KEY `uq_slot` (`schedule_date`,`hour`,`order`),
   KEY `ix_date_song` (`schedule_date`,`song_id`),
   -- ix_song_date is not a duplicate of ix_date_song. The separation
-  -- subqueries filter `song_id = ?` with `schedule_date >= ?` — a range
+  -- subqueries filter `song_id = ?` with `schedule_date >= ?` - a range
   -- on the leading column of ix_date_song, which stops it being usable
   -- for song_id. Leading on song_id makes those a covering lookup and
   -- is most of the difference between a day building in seconds and in
@@ -180,7 +180,7 @@ CREATE TABLE IF NOT EXISTS `clock_grids` (
 
 
 -- =====================================================================
--- 2. GRID HOURS — the cells
+-- 2. GRID HOURS - the cells
 --
 -- `dow` is ISO: 1 = Monday ... 7 = Sunday. NOT MySQL's DAYOFWEEK(),
 -- which is 1 = Sunday. The conversion happens in ClockGridDow() and
@@ -211,7 +211,7 @@ CREATE TABLE IF NOT EXISTS `clock_grid_hours` (
 
 
 -- =====================================================================
--- 3. GRID SCHEDULE — pin one date to one grid
+-- 3. GRID SCHEDULE - pin one date to one grid
 --
 -- Holidays, and any day whose whole layout differs. Beats the rotation,
 -- loses to an override. One row per date, so it cannot be ambiguous.
@@ -230,7 +230,7 @@ CREATE TABLE IF NOT EXISTS `clock_grid_schedule` (
 
 
 -- =====================================================================
--- 4. ROTATIONS — ordered cycles of grids, one grid per week
+-- 4. ROTATIONS - ordered cycles of grids, one grid per week
 --
 -- The arithmetic below is deliberate and is the part people get
 -- wrong, so it is spelled out rather than left to be inferred.
@@ -252,7 +252,7 @@ CREATE TABLE IF NOT EXISTS `clock_grid_schedule` (
 -- the week edge silently changes which grid a given date resolves to.
 --
 -- SEVERAL rotations may be active at once provided their date ranges
--- do not overlap — a summer rotation and a winter one. Overlap is a
+-- do not overlap - a summer rotation and a winter one. Overlap is a
 -- configuration error; section 13 has the query that finds it.
 -- =====================================================================
 
@@ -287,7 +287,7 @@ CREATE TABLE IF NOT EXISTS `clock_grid_rotation_entries` (
 
 
 -- =====================================================================
--- 5. MONTHLY RULES — calendar-anchored, whole grid
+-- 5. MONTHLY RULES - calendar-anchored, whole grid
 --
 -- An ordinal plus an ISO weekday selects a grid for that date. "First Saturday of the month
 -- runs the Holiday grid."
@@ -295,7 +295,7 @@ CREATE TABLE IF NOT EXISTS `clock_grid_rotation_entries` (
 -- This sits ABOVE the rotation and BELOW a dated pin, matching the
 -- API's precedence exactly.
 --
--- A NUMBERED RULE BEATS A `LAST` RULE when both land on the same date —
+-- A NUMBERED RULE BEATS A `LAST` RULE when both land on the same date -
 -- their documented behaviour, and the reason `ordinal DESC` orders the
 -- lookup (-1 sorts last).
 --
@@ -328,7 +328,7 @@ CREATE TABLE IF NOT EXISTS `clock_grid_monthly_rules` (
 
 
 -- =====================================================================
--- 6. OVERRIDES — recurring or one-off, at hour granularity
+-- 6. OVERRIDES - recurring or one-off, at hour granularity
 --
 -- This is where bi-weekly and monthly SHOWS live, as opposed to
 -- bi-weekly WEEKS which are the rotation's job. A single show on
@@ -442,7 +442,7 @@ DELIMITER //
 --   4  clock_grids.is_default    the fallback       (their station_default)
 --
 -- Returns NULL if nothing resolves. The API treats that as a valid
--- "nothing scheduled" state; we do NOT — ScheduleBuildSkeleton signals,
+-- "nothing scheduled" state; we do NOT - ScheduleBuildSkeleton signals,
 -- because their consumer is a programme guide and ours drives playout.
 -- A radio station cannot have an hour with no clock, and a nightly
 -- build that quietly picked "some" grid is worse than one that stops.
@@ -478,7 +478,7 @@ BEGIN
     END IF;
 
     -- 3. the rotation. 7-day arithmetic from the rotation's OWN
-    --    start_date — not from a Monday, and not from WEEK(). A Tuesday
+    --    start_date - not from a Monday, and not from WEEK(). A Tuesday
     --    start_date therefore swaps grids on Tuesdays. `p_date >=
     --    start_date` keeps DATEDIFF non-negative, so MOD cannot go
     --    negative and look for a position that does not exist.
@@ -695,7 +695,7 @@ BEGIN
             -- Predicted on-air offset within the hour: the running sum
             -- of the average runtimes of everything before this entry.
             -- A special entry has no subcategory, so the LEFT JOIN
-            -- below yields NULL and it contributes 0 — same as before,
+            -- below yields NULL and it contributes 0 - same as before,
             -- and the reason the join is on the guarded expression
             -- rather than on rl.subID directly.
             ROUND(COALESCE(
@@ -1384,7 +1384,7 @@ DELIMITER ;
 
 
 -- =====================================================================
--- 11. ClockGridFill — paint a whole grid from one clock
+-- 11. ClockGridFill - paint a whole grid from one clock
 --
 -- 168 cells is a lot to type. This gives a grid a uniform starting
 -- state you then differentiate. Idempotent per cell.
@@ -1503,14 +1503,14 @@ DELIMITER ;
 
 
 -- =====================================================================
--- CONFIGURE BEFORE USE — the install is inert until this row exists.
+-- CONFIGURE BEFORE USE - the install is inert until this row exists.
 --
 -- Every procedure reads scheduler_config row 1 and signals
 -- 'scheduler_config row 1 is missing' if it is absent. That is on
 -- purpose: a fresh install refusing to run beats one quietly writing
 -- to another station's playlist ID.
 --
--- Look up the real IDs on THIS station first — the defaults below are
+-- Look up the real IDs on THIS station first - the defaults below are
 -- one station's values and mean nothing anywhere else.
 -- =====================================================================
 
@@ -1523,7 +1523,7 @@ DELIMITER ;
 --
 -- playlist_id must match the playlist RadioDJ's own hourly loader
 -- event pulls (type 2, data `Load Playlist|<pos>|<id>|<name>|Top`).
--- Do not copy a value from any dump — dumps drift from live.
+-- Do not copy a value from any dump - dumps drift from live.
 
 -- THE CLOCK GRID MUST BE PAINTED BEFORE THE FIRST BUILD.
 -- This file creates the grid tables but cannot seed them: it also
@@ -1534,7 +1534,7 @@ DELIMITER ;
 --   VALUES ('Regular', 1);
 --   CALL ClockGridFill(LAST_INSERT_ID(), <your main clock ID>, @cells);
 --
--- That gives one clock every hour of every day — correct for a station
+-- That gives one clock every hour of every day - correct for a station
 -- running a single grid, and the starting point for one that is not.
 -- Then differentiate cells, and read a date back before trusting it:
 --

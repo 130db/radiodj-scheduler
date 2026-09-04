@@ -1,4 +1,4 @@
-# RadioDJ Scheduler — Install Guide
+# RadioDJ Scheduler - Install Guide
 
 Work through this from top to bottom. Each step tells you what to run, what the
 answer should look like, and what to do if it isn't.
@@ -21,14 +21,14 @@ rotations or *your* library.
 
 The safe way, and it costs about an hour:
 
-1. Take a full backup of your RadioDJ database — [Step 0](#step-0--back-up).
-2. Restore that backup into a **second, empty** database — the commands are in
+1. Take a full backup of your RadioDJ database - [Step 0](#step-0---back-up).
+2. Restore that backup into a **second, empty** database - the commands are in
    [Step 0](#restore-it-into-a-test-database-first). Call it something like
    `mystation_test`.
 3. Do this whole install against `mystation_test`.
 4. Build a day, look at it, decide whether you like what it did.
 5. Only then repeat on the real one.
-6. **Delete the test database afterwards** — also in
+6. **Delete the test database afterwards** - also in
    [Step 0](#restore-it-into-a-test-database-first), and it matters more than it
    sounds.
 
@@ -46,7 +46,7 @@ at it before it airs.
 This adds both: a weekly clock grid, and a materialised schedule built a day
 ahead.
 
-**What it does not do.** It does not replace RadioDJ's own rotations — it *uses*
+**What it does not do.** It does not replace RadioDJ's own rotations - it *uses*
 them. You still design the shape of an hour in RadioDJ's rotation editor. This
 decides which hour gets which shape, and picks the actual tracks a day in
 advance. It does not touch your audio files and it does not delete tracks.
@@ -61,27 +61,28 @@ advance. It does not touch your audio files and it does not delete tracks.
 | ☐ | **MySQL 8.0.x. Not MariaDB.** The official RadioDJ docs suggest MariaDB; this is developed and tested on MySQL and uses MySQL 8 features (window functions, `CHECK` constraints) |
 | ☐ | HeidiSQL, connected to your RadioDJ database |
 | ☐ | At least one rotation already built in RadioDJ, with real audio in the categories it references |
-| ☐ | A backup — [Step 0](#step-0--back-up), do not skip it |
-| ☐ | 30–60 minutes. Do not start this an hour before a live show |
+| ☐ | A backup - [Step 0](#step-0---back-up), do not skip it |
+| ☐ | 30-60 minutes. Do not start this an hour before a live show |
 
 **Select your database before you run anything.** Click your station's database
 in HeidiSQL's left-hand tree. There is no `USE` statement anywhere in these
-files, on purpose — that is what lets the same file work on any station. It also
+files, on purpose - that is what lets the same file work on any station. It also
 means an unselected database installs nothing, or installs into the wrong place.
 
 ### Contents
 
-- [Step 0 — Back up](#step-0--back-up)
-- [Step 1 — Where am I?](#step-1--where-am-i)
-- [Step 2 — Fix RadioDJ's own schema](#step-2--fix-radiodjs-own-schema)
-- [Step 3 — Install the scheduler](#step-3--install-the-scheduler)
-- [Step 4 — Tell it about your station](#step-4--tell-it-about-your-station)
-- [Step 5 — Create clocks](#step-5--create-clocks)
-- [Step 6 — Paint the weekly grid](#step-6--paint-the-weekly-grid)
-- [Step 7 — Fill order](#step-7--fill-order)
-- [Step 8 — Build a day and look at it](#step-8--build-a-day-and-look-at-it)
-- [Step 9 — Turn on the nightly build](#step-9--turn-on-the-nightly-build)
-- [Step 10 — Tomorrow morning](#step-10--tomorrow-morning)
+- [Step 0 - Back up](#step-0---back-up)
+- [Step 1 - Where am I?](#step-1---where-am-i)
+- [Step 2 - Fix RadioDJ's own schema](#step-2---fix-radiodjs-own-schema)
+- [Step 3 - Install the scheduler](#step-3---install-the-scheduler)
+- [Step 4 - Tell it about your station](#step-4---tell-it-about-your-station)
+- [Step 5 - Create clocks](#step-5---create-clocks)
+- [Step 6 - Paint the weekly grid](#step-6---paint-the-weekly-grid)
+- [Step 7 - Fill order](#step-7---fill-order)
+- [Step 8 - Build a day and look at it](#step-8---build-a-day-and-look-at-it)
+- [Step 9 - Create the event in RadioDJ](#step-9---create-the-event-in-radiodj)
+- [Step 10 - Turn on the nightly build](#step-10---turn-on-the-nightly-build)
+- [Step 11 - Tomorrow morning](#step-11---tomorrow-morning)
 - [Day-to-day use](#day-to-day-use)
 - [Optional extras](#optional-extras)
 - [Technical notes](#technical-notes)
@@ -89,7 +90,7 @@ means an unselected database installs nothing, or installs into the wrong place.
 
 ---
 
-## Step 0 — Back up
+## Step 0 - Back up
 
 Not in SQL, because a backup taken from inside the thing you are about to change
 is not a backup. In a terminal or Command Prompt:
@@ -130,15 +131,15 @@ DROP DATABASE mystation_test;
 
 This is not tidiness. The scheduler's three events live *in* the database, and
 your backup carries a copy of RadioDJ's tables with it. Once
-[Step 9](#step-9--turn-on-the-nightly-build) turns the event scheduler on
-permanently, the events in `mystation_test` keep firing too — building a day
+[Step 10](#step-10---turn-on-the-nightly-build) turns the event scheduler on
+permanently, the events in `mystation_test` keep firing too - building a day
 every night and pushing a playlist every hour, forever, into a database nobody
 is looking at. They are scoped to their own database so they cannot reach your
 real station, but they are a background job you will never think about again,
 and `schedule_log` in there grows without limit.
 
 If you would rather keep the test database around for a while, disable its
-events instead of dropping it — select it in HeidiSQL and run:
+events instead of dropping it - select it in HeidiSQL and run:
 
 ```sql
 ALTER EVENT `ScheduleNextDay` DISABLE;
@@ -148,7 +149,7 @@ ALTER EVENT `SubcategoryRecalculateRuntimes` DISABLE;
 
 ---
 
-## Step 1 — Where am I?
+## Step 1 - Where am I?
 
 Confirms you are pointed at the right database and that it really is RadioDJ.
 Everything after this assumes both.
@@ -172,12 +173,12 @@ SELECT
 |---|---|
 | `you_are_installing_into` | **Your station.** `NULL` means you have not selected a database |
 | `radiodj_tables_found` | **6.** Fewer means this is not a RadioDJ database |
-| `rotations_defined` | **At least 1.** If it is 0, stop and build a rotation in RadioDJ first — this scheduler has nothing to schedule without one |
+| `rotations_defined` | **At least 1.** If it is 0, stop and build a rotation in RadioDJ first - this scheduler has nothing to schedule without one |
 | `mysql_version` | Starts with **8.0** |
 
 ---
 
-## Step 2 — Fix RadioDJ's own schema
+## Step 2 - Fix RadioDJ's own schema
 
 > **Run [`radiodj-schema-fixes.sql`](radiodj-schema-fixes.sql) now, then come back.**
 
@@ -194,11 +195,11 @@ they bite whether you install it or not:
 4. A signedness mismatch in `playlists_list`.
 5. `songs.lang` defaults to the wrong sentinel.
 
-**Fix 3 is the one to care about, and this scheduler depends on it** — without
+**Fix 3 is the one to care about, and this scheduler depends on it** - without
 it, special rotation entries can never work.
 
 The file is safe to re-run and prints `OK` or `FAILED` for each fix. **Re-run it
-after every RadioDJ upgrade** — a RadioDJ update can quietly put any of the five
+after every RadioDJ upgrade** - a RadioDJ update can quietly put any of the five
 back.
 
 Confirm you actually ran it. All five must read `OK`:
@@ -222,7 +223,7 @@ UNION ALL SELECT 'songs.lang default', IF((SELECT COLUMN_DEFAULT FROM informatio
 
 ---
 
-## Step 3 — Install the scheduler
+## Step 3 - Install the scheduler
 
 > **Run [`scheduler-create.sql`](scheduler-create.sql) now, then come back.**
 
@@ -233,12 +234,12 @@ deletes nothing.
 It also adds **one trigger to RadioDJ's own `songs` table**, `SongsInsert`. It
 is the only thing here that writes to a RadioDJ table, it only fires on
 `INSERT`, and it exists so that a library import does not put every new track on
-the air at once — [The `songs` trigger](#the-songs-trigger) in Technical notes
+the air at once - [The `songs` trigger](#the-songs-trigger) in Technical notes
 explains it in full. Read that before your next bulk import.
 
 **It must be run from HeidiSQL**, not from a script or a programming language. It
 contains `DELIMITER` lines, which are an instruction to the *client*, not to
-MySQL — a driver sends them to the server, which has never heard of `DELIMITER`,
+MySQL - a driver sends them to the server, which has never heard of `DELIMITER`,
 and the whole thing fails on the first line.
 
 **It is not re-runnable.** It is a fresh install. If it fails halfway, run
@@ -266,7 +267,7 @@ SELECT
 `average_runtime` and `fill_priority` are columns this scheduler adds to
 RadioDJ's `subcategory` table. **They must carry defaults.** RadioDJ does not
 know the columns exist, so it does not supply values when you add a subcategory
-in its UI — and if MySQL rejects that insert, **RadioDJ shows no error.** You
+in its UI - and if MySQL rejects that insert, **RadioDJ shows no error.** You
 click "add subcategory", nothing happens, and nothing explains why.
 
 ```sql
@@ -289,7 +290,7 @@ ALTER TABLE `subcategory` MODIFY `fill_priority`   int unsigned NOT NULL DEFAULT
 
 ---
 
-## Step 4 — Tell it about your station
+## Step 4 - Tell it about your station
 
 Four numbers. This is the only place your station's own IDs live, and getting
 `playlist_id` wrong is the single most common way to end up with a scheduler that
@@ -298,17 +299,17 @@ reports perfect health and changes nothing on air.
 **Do not copy these numbers from someone else's station, or from an old backup.**
 Read them from *this* database, now.
 
-### 4a — Your categories
+### 4a - Your categories
 
 You want the ID of your **music** category and the ID of your **jingles**
-category (sweepers, links, station IDs — whatever you call the short things
+category (sweepers, links, station IDs - whatever you call the short things
 between songs).
 
 ```sql
 SELECT ID, name FROM category ORDER BY ID;
 ```
 
-### 4b — Your playlists
+### 4b - Your playlists
 
 The scheduler writes the next hour into **one** playlist, and RadioDJ loads that
 playlist on the hour.
@@ -317,7 +318,7 @@ playlist on the hour.
 SELECT ID, name FROM playlists ORDER BY ID;
 ```
 
-### 4c — This is the important one
+### 4c - This is the important one
 
 RadioDJ has its own hourly event that loads a playlist. Its `data` looks like:
 
@@ -336,11 +337,13 @@ SELECT ID, name, type, data FROM events WHERE data LIKE '%Load Playlist|%';
 > B, and both sides report success.** Nothing errors. You just hear the wrong
 > thing, or silence.
 
-If this returns **no rows**, you have not set up RadioDJ's hourly loader yet. Do
-that in RadioDJ first: an event of type "Load Playlist", repeating hourly,
-loading the playlist you picked in 4b, inserting at Top. Then re-run 4c.
+If this returns **no rows**, you have not built RadioDJ's hourly loader yet.
+That is [Step 9](#step-9---create-the-event-in-radiodj), and it is mandatory -
+without it nothing you schedule ever reaches the air. You can carry on to 4d for
+now and come back: 4c only needs the playlist ID from 4b, which you already
+have.
 
-### 4d — Which category marks a jingle
+### 4d - Which category marks a jingle
 
 Usually the same number as your jingles category from 4a.
 
@@ -349,7 +352,7 @@ SELECT catID, COUNT(*) AS entries_using_it
 FROM rotations_list WHERE catID > 0 GROUP BY catID ORDER BY catID;
 ```
 
-### 4e — Now write it
+### 4e - Now write it
 
 Replace the four placeholders with the numbers you just read.
 
@@ -382,7 +385,7 @@ WHERE cfg.ID = 1;
 
 ---
 
-## Step 5 — Create clocks
+## Step 5 - Create clocks
 
 A "clock" here is just a **name pointing at one of your RadioDJ rotations**. It
 is how the grid in Step 6 refers to *"this hour looks like that"*.
@@ -416,7 +419,7 @@ FROM clocks c LEFT JOIN rotations r ON r.ID = c.rotation_id ORDER BY c.ID;
 
 ---
 
-## Step 6 — Paint the weekly grid
+## Step 6 - Paint the weekly grid
 
 The grid is 7 days × 24 hours = **168 cells**, and each cell says which clock
 owns that hour of that weekday.
@@ -426,16 +429,16 @@ owns that hour of that weekday.
 
 Day numbers are **1 = Monday** through **7 = Sunday**.
 
-### 6a — Create the grid and fill all 168 cells
+### 6a - Create the grid and fill all 168 cells
 
 ```sql
 INSERT INTO `clock_grids` (`name`, `is_default`) VALUES ('Regular', 1);
 CALL ClockGridFill(LAST_INSERT_ID(), <your main clock ID>, @cells);
 ```
 
-### 6b — Optional: change the hours that differ
+### 6b - Optional: change the hours that differ
 
-Nights, every day, 00:00–05:59:
+Nights, every day, 00:00-05:59:
 
 ```sql
 UPDATE clock_grid_hours SET clock_id = <night clock>
@@ -443,7 +446,7 @@ WHERE grid_id = (SELECT ID FROM clock_grids WHERE is_default = 1)
   AND `hour` BETWEEN 0 AND 5;
 ```
 
-Weekend daytime only — Saturday and Sunday, 08:00–17:59:
+Weekend daytime only - Saturday and Sunday, 08:00-17:59:
 
 ```sql
 UPDATE clock_grid_hours SET clock_id = <weekend clock>
@@ -451,7 +454,7 @@ WHERE grid_id = (SELECT ID FROM clock_grids WHERE is_default = 1)
   AND dow IN (6, 7) AND `hour` BETWEEN 8 AND 17;
 ```
 
-### 6c — Check the grid is complete
+### 6c - Check the grid is complete
 
 `cells` must be **168**:
 
@@ -463,7 +466,7 @@ SELECT g.ID, g.name, g.is_default,
 FROM clock_grids g ORDER BY g.ID;
 ```
 
-### 6d — Read the grid back
+### 6d - Read the grid back
 
 24 rows for one date, naming which clock owns each hour and why. **Do this after
 every change you make.**
@@ -474,13 +477,13 @@ CALL ClockGridExplain(CURDATE() + INTERVAL 3 DAY);
 
 ---
 
-## Step 7 — Fill order
+## Step 7 - Fill order
 
 **Do not skip this if any subcategory is small.**
 
 `subcategory.fill_priority` decides **which slots get first pick of the
-library**. The fill walks slots in `fill_priority ASC` order — *lower number is
-filled first* — and every track it takes is then unavailable to later slots for
+library**. The fill walks slots in `fill_priority ASC` order - *lower number is
+filled first* - and every track it takes is then unavailable to later slots for
 the length of the separation window.
 
 Default is 100 for everything, which means "no preference".
@@ -492,7 +495,7 @@ still contain something eligible.
 
 A subcategory with 12 tracks cannot. If it is filled last, the few tracks it is
 allowed to use may already have been placed elsewhere in the day, and separation
-then rules out every remaining candidate. **The slot comes out empty — not
+then rules out every remaining candidate. **The slot comes out empty - not
 because the subcategory is empty, but because it queued behind everyone else.**
 
 Give it a lower number and it chooses first, while its whole pool is still
@@ -501,7 +504,7 @@ available. The big pools absorb the constraint instead, because they can.
 > **Rule of thumb: order by scarcity, not by importance.** The scarcest pool goes
 > first.
 
-### 7a — How much audio each subcategory really has
+### 7a - How much audio each subcategory really has
 
 Worst first. This is the list to set priorities from.
 
@@ -518,7 +521,7 @@ GROUP BY sc.ID, sc.name, c.name, sc.fill_priority
 ORDER BY hours_of_audio ASC;
 ```
 
-### 7b — Set them
+### 7b - Set them
 
 Lower goes first. Leave everything else at 100.
 
@@ -543,7 +546,7 @@ exists; it cannot create tracks.
 
 ---
 
-## Step 8 — Build a day and look at it
+## Step 8 - Build a day and look at it
 
 Three days from now, so it cannot collide with anything RadioDJ is about to play,
 and so the automatic nightly build does not overwrite it while you are looking.
@@ -618,7 +621,82 @@ DELETE FROM schedule WHERE schedule_date = CURDATE() + INTERVAL 3 DAY;
 
 ---
 
-## Step 9 — Turn on the nightly build
+## Step 9 - Create the event in RadioDJ
+
+Everything so far fills a playlist. Nothing yet tells RadioDJ to play it. This
+step is the handoff, and without it the whole chain runs perfectly and is
+inaudible.
+
+> **Do this in RadioDJ's interface, never in SQL.** RadioDJ reads the `events`
+> table into memory and only re-reads it when you open the Event Window. An
+> event you `INSERT` yourself sits in the database looking correct and never
+> fires - and anything of ours that reads the table sees it, so both sides
+> report healthy. See
+> [RadioDJ caches its events in memory](#radiodj-caches-its-events-in-memory).
+
+In RadioDJ, open the events window and add a new event:
+
+| Field | Value |
+|---|---|
+| Event Name | `Schedule` |
+| Event Type | **Repeat by Day and Hour** |
+| Event Category | `Schedule` |
+| Enabled | ticked |
+| Event Hour | leave it - the dialog says *Hour will be ignored!* |
+| Smart Timing | unticked |
+| Days | **all seven ticked** |
+| Hours | **all 24 ticked** |
+
+Then add four actions, **in this order**:
+
+```
+1  AutoDJ Disable!
+2  Clear Playlist!
+3  Load Playlist|0|<YOUR PLAYLIST ID>|<name>|Top
+4  AutoDJ Enable!
+```
+
+Action 3 is the one you configure - pick the playlist you chose in
+[4b](#4b---your-playlists) and insert at `Top`. The other three are literal.
+
+**The order is the point.** `Clear Playlist!` before the load is what stops the
+playlist growing by an hour every hour. The `AutoDJ Disable!` / `AutoDJ Enable!`
+pair around it stops RadioDJ reaching for a rotation during the moment the
+playlist is empty mid-swap.
+
+Save the event. Now check that what RadioDJ stored agrees with what the
+scheduler fills - `verdict` must say `AGREES`:
+
+```sql
+SELECT e.ID, e.name, e.type,
+       CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(
+           SUBSTRING_INDEX(e.data, 'Load Playlist|', -1), '|', 2), '|', -1)
+           AS UNSIGNED)                     AS radiodj_will_load,
+       cfg.playlist_id                      AS scheduler_fills,
+       IF(cfg.playlist_id = CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(
+           SUBSTRING_INDEX(e.data, 'Load Playlist|', -1), '|', 2), '|', -1)
+           AS UNSIGNED), 'AGREES', '*** MISMATCH - FIX THIS ***') AS verdict
+FROM events e
+CROSS JOIN scheduler_config cfg
+WHERE e.data LIKE '%Load Playlist|%' AND cfg.ID = 1;
+```
+
+**No rows** means RadioDJ did not save what you think it saved - reopen the
+event and check action 3. A `MISMATCH` means the two numbers disagree, and that
+is the failure where the scheduler fills playlist A, RadioDJ loads playlist B,
+and neither reports a problem.
+
+### Optional: a manual trigger for mid-hour reloads
+
+The event above fires on the hour. Make a second one with the **same four
+actions** and Event Type **Manual**, named something like `Schedule (M)`. Firing
+it from the events window reloads the current hour immediately, which is what
+you want after rebuilding part of today - see
+[Rebuild part of today](#rebuild-part-of-today).
+
+---
+
+## Step 10 - Turn on the nightly build
 
 Two events do the work from here, plus one that pushes each hour to air:
 
@@ -662,7 +740,7 @@ ORDER BY EVENT_NAME;
 
 ---
 
-## Step 10 — Tomorrow morning
+## Step 11 - Tomorrow morning
 
 Check it built overnight. Run this the next day.
 
@@ -676,7 +754,7 @@ FROM schedule GROUP BY schedule_date ORDER BY schedule_date DESC LIMIT 7;
 ```
 
 `ok = 0` means a build failed and `message` says why. **No rows at all** means
-the event scheduler is off — back to [Step 9](#step-9--turn-on-the-nightly-build).
+the event scheduler is off - back to [Step 10](#step-10---turn-on-the-nightly-build).
 
 ---
 
@@ -684,7 +762,7 @@ the event scheduler is off — back to [Step 9](#step-9--turn-on-the-nightly-bui
 
 ### Rebuild a whole day
 
-Three days out. Never a past date, and never tomorrow — tomorrow is overwritten
+Three days out. Never a past date, and never tomorrow - tomorrow is overwritten
 at 23:30.
 
 ```sql
@@ -716,7 +794,7 @@ CALL ScheduleFillFallback(@d, @ff, @fu);
 CALL ScheduleRecalculateAirtime(@d, @h, @a);
 ```
 
-Hours below `@h` are untouched and act as fixed separation context — a track
+Hours below `@h` are untouched and act as fixed separation context - a track
 sitting unplayed in an earlier hour still blocks candidates in the rebuilt hours.
 That is the point of a partial rebuild.
 
@@ -771,7 +849,7 @@ VALUES ('2026-12-24', (SELECT ID FROM clock_grids WHERE name='Christmas'),
 ### A show every other week
 
 `anchor_date` is any date the show **does** air; `dow` is 1=Monday..7=Sunday;
-`hour` is 0–23.
+`hour` is 0-23.
 
 ```sql
 INSERT INTO `clock_overrides`
@@ -781,7 +859,7 @@ VALUES ('Rock Hour', <clock>, 20, 'nweekly', 6, 2, '2026-09-05');
 
 ### A show once a month
 
-`nth` is 1–5, or `-1` for "the last one".
+`nth` is 1-5, or `-1` for "the last one".
 
 ```sql
 INSERT INTO `clock_overrides`
@@ -815,7 +893,7 @@ Your rotations stay in RadioDJ and define the *shape* of an hour.
 `ScheduleBuildSkeleton` resolves the grid for a date and expands the rotation
 into one `schedule` row per slot. `ScheduleFill` then picks an actual track for
 each slot, honouring separation. `SchedulePushPlaylist` copies the next hour into
-the playlist RadioDJ loads. Nothing is cached in between — the day is built from
+the playlist RadioDJ loads. Nothing is cached in between - the day is built from
 `rotations_list` every time.
 
 ### What lives where
@@ -823,7 +901,7 @@ the playlist RadioDJ loads. Nothing is cached in between — the day is built fr
 Station-specific values: `scheduler_config`, row 1. Four numbers.
 
 Separation and genre rules: **per rotation rule, in RadioDJ's own rotation
-editor** — `repeatRule`, `track_separation`, `artist_separation`,
+editor** - `repeatRule`, `track_separation`, `artist_separation`,
 `title_separation`, `genID`. This scheduler reads the same columns RadioDJ does,
 so one edit covers both.
 
@@ -845,7 +923,7 @@ you change them, change both.
 ### Which version is installed
 
 `scheduler_config.version` records which release of `scheduler-create.sql` built
-this install. Nothing reads it — it exists so the question has an answer.
+this install. Nothing reads it - it exists so the question has an answer.
 
 ```sql
 SELECT version FROM scheduler_config WHERE ID = 1;
@@ -868,7 +946,7 @@ RadioDJ's `songs` table. It is the only object here that writes to a table
 RadioDJ owns, so it is worth understanding rather than discovering.
 
 **The problem it solves.** RadioDJ stamps every newly added track with
-`date_played = '2002-01-01 00:00:01'` — the never-played sentinel from the
+`date_played = '2002-01-01 00:00:01'` - the never-played sentinel from the
 section above. Both RadioDJ's rotations and this scheduler choose the **least
 recently played** eligible track, and 2002 is older than any real date in your
 library. Every track you add is therefore, simultaneously, the most overdue
@@ -902,8 +980,8 @@ sentinel. Drop the trigger before a restore if that matters to you.
 **The trade-off.** After an import, nothing in your library reads as
 never-played. `WHERE date_played = '2002-01-01 00:00:01'` returns nothing, and
 "which tracks have never aired?" stops being a question the database can answer.
-If you would rather keep the sentinel and handle the flood yourself — by staging
-an import into a holding subcategory, say — drop it:
+If you would rather keep the sentinel and handle the flood yourself - by staging
+an import into a holding subcategory, say - drop it:
 
 ```sql
 DROP TRIGGER IF EXISTS `SongsInsert`;
@@ -923,7 +1001,7 @@ event", `-100` "a listener request", and the row carries the same sentinel in
 
 Once in `scheduler_config.playlist_id`, once inside RadioDJ's own event `data`,
 and nothing enforces agreement. When they diverge, both sides report healthy.
-[Step 4](#step-4--tell-it-about-your-station) checks it; check it again after
+[Step 4](#step-4---tell-it-about-your-station) checks it; check it again after
 editing events in RadioDJ.
 
 ### RadioDJ caches its events in memory
@@ -947,7 +1025,7 @@ what was planned.
 
 ### Two RadioDJ install notes
 
-**Never install RadioDJ under `C:\Program Files`** — Windows blocks it from
+**Never install RadioDJ under `C:\Program Files`** - Windows blocks it from
 writing its own files. `C:\RDJ\<STATION>\` is a good convention.
 
 **Keep `StoreSettingsToDatabase` set to False.** Settings belong in the XML
@@ -960,20 +1038,20 @@ with it.
 
 | Error or symptom | Cause |
 |---|---|
-| `no grid resolves for <date>` | No default grid, or it has fewer than 168 cells → [6c](#6c--check-the-grid-is-complete) |
-| `no clock for <date> hour N` | That cell is empty → [6c](#6c--check-the-grid-is-complete) |
-| `clock N owns … but has no rotation` | A clock with `rotation_id` NULL → [Step 5](#step-5--create-clocks) |
-| `scheduler_config row 1 is missing` | [Step 4](#step-4--tell-it-about-your-station) was skipped |
-| Empty slots | A subcategory holds less audio than its separation window is long → [Step 8](#step-8--build-a-day-and-look-at-it) groups them |
-| Everything looks right in the database but nothing changes on air | The playlist IDs disagree → [4e](#4e--now-write-it) |
+| `no grid resolves for <date>` | No default grid, or it has fewer than 168 cells → [6c](#6c---check-the-grid-is-complete) |
+| `no clock for <date> hour N` | That cell is empty → [6c](#6c---check-the-grid-is-complete) |
+| `clock N owns … but has no rotation` | A clock with `rotation_id` NULL → [Step 5](#step-5---create-clocks) |
+| `scheduler_config row 1 is missing` | [Step 4](#step-4---tell-it-about-your-station) was skipped |
+| Empty slots | A subcategory holds less audio than its separation window is long → [Step 8](#step-8---build-a-day-and-look-at-it) groups them |
+| Everything looks right in the database but nothing changes on air | No loader event in RadioDJ, or the playlist IDs disagree → [Step 9](#step-9---create-the-event-in-radiodj) |
 | Adding a subcategory in RadioDJ silently does nothing | A column default is missing → [Step 3](#check-the-column-defaults-specifically) |
-| It worked, then stopped after a reboot | MySQL's event scheduler is off → [Step 9](#step-9--turn-on-the-nightly-build) |
-| You want it all gone | Run [`scheduler-remove.sql`](scheduler-remove.sql). It removes this scheduler and nothing of RadioDJ's — but it *does* delete your clocks, your grid and every built day |
+| It worked, then stopped after a reboot | MySQL's event scheduler is off → [Step 10](#step-10---turn-on-the-nightly-build) |
+| You want it all gone | Run [`scheduler-remove.sql`](scheduler-remove.sql). It removes this scheduler and nothing of RadioDJ's - but it *does* delete your clocks, your grid and every built day |
 
 ---
 
 When reporting a problem, include `SELECT version FROM scheduler_config WHERE
-ID = 1;` and `SELECT VERSION();` — the first says which release you are running,
+ID = 1;` and `SELECT VERSION();` - the first says which release you are running,
 the second which MySQL.
 
 If this saved you some work, there is a link at the bottom of

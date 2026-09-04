@@ -1,5 +1,5 @@
 -- =====================================================================
--- RadioDJ schema fixes — every correction we make to RadioDJ's OWN
+-- RadioDJ schema fixes - every correction we make to RadioDJ's OWN
 -- schema, in one re-runnable file.
 --
 -- Target: RadioDJ 3.0.0.2 / MySQL 8.0.x / ANY station.
@@ -18,7 +18,7 @@
 --     RUN IT AFTER EVERY RadioDJ VERSION UPGRADE, ON EVERY STATION,
 --     AND READ SECTION 9.
 --
--- It is also what a brand-new station needs before anything else — a
+-- It is also what a brand-new station needs before anything else - a
 -- fresh RadioDJ install has all five defects.
 --
 -- STATION-AGNOSTIC BY DESIGN. There is no `USE` statement and no
@@ -45,7 +45,7 @@
 
 
 -- =====================================================================
--- 1. PRE-FLIGHT — the current state of all five fixes
+-- 1. PRE-FLIGHT - the current state of all five fixes
 -- =====================================================================
 
 SELECT
@@ -66,7 +66,7 @@ SELECT
         AND COLUMN_NAME = 'lang')                           AS songs_lang_default;
 
 -- Any table off the house collation. Expect zero rows. This is a
--- REPORT, not a fix — converting a table is not always what you want,
+-- REPORT, not a fix - converting a table is not always what you want,
 -- and on our own appended tables it would mask a missing explicit
 -- COLLATE rather than fix it. If a row appears, look at why before
 -- running CONVERT TO on it.
@@ -101,7 +101,7 @@ FROM rotations_list;
 
 
 -- =====================================================================
--- 2. FIX 1 — database default collation
+-- 2. FIX 1 - database default collation
 --
 -- RadioDJ creates the database without specifying a collation, so it
 -- inherits the MySQL 8 server default `utf8mb4_0900_ai_ci` while every
@@ -115,13 +115,13 @@ FROM rotations_list;
 -- reason, but the database default is the trap underneath it, and a
 -- trap you have to remember is a trap.
 --
--- Existing tables are NOT touched — this only changes what a future
+-- Existing tables are NOT touched - this only changes what a future
 -- bare CREATE TABLE inherits. Instant, metadata-only, and naturally
 -- idempotent, so it needs no guard.
 --
 -- THE DATABASE NAME IS DELIBERATELY OMITTED. `ALTER DATABASE` takes an
 -- optional name and applies to the currently selected database when it
--- is left out — which is what keeps this file station-agnostic.
+-- is left out - which is what keeps this file station-agnostic.
 --
 -- Do not "improve" this into a guarded PREPARE like the other four
 -- fixes. ALTER DATABASE cannot go through the prepared-statement
@@ -138,7 +138,7 @@ ALTER DATABASE CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 
 -- =====================================================================
--- 3. FIX 2 — widen history text columns 200 -> 250
+-- 3. FIX 2 - widen history text columns 200 -> 250
 --
 -- RadioDJ declares these eight columns at varchar(200) in `history`
 -- and varchar(250) in `songs`. Every insert into history therefore
@@ -151,7 +151,7 @@ ALTER DATABASE CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 -- unknown-year sentinel column, leave it alone (songs.year is varchar(4) and '1900' is the unknown-year sentinel, not a real year).
 --
 -- NOT NULL and COLLATE are restated because MySQL's MODIFY replaces
--- the entire column definition — omitting them would silently make
+-- the entire column definition - omitting them would silently make
 -- these columns nullable.
 --
 -- ALGORITHM=INPLACE, LOCK=NONE is a safety assertion, not an
@@ -185,7 +185,7 @@ PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
 
 -- =====================================================================
--- 4. FIX 3 — rotations_list.catID / subID / genID must be SIGNED
+-- 4. FIX 3 - rotations_list.catID / subID / genID must be SIGNED
 --
 -- THE MOST CONSEQUENTIAL FIX IN THIS FILE. Found on a live station
 -- where all three columns were `int unsigned`.
@@ -199,8 +199,8 @@ PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 --
 -- and the row then carries the SAME sentinel in subID AND genID.
 --
--- On an unsigned column under STRICT_TRANS_TABLES — which is the MySQL
--- 8 default and what production runs — the write does not clamp, it
+-- On an unsigned column under STRICT_TRANS_TABLES - which is the MySQL
+-- 8 default and what production runs - the write does not clamp, it
 -- FAILS:
 --     ERROR 1264 Out of range value for column 'catID' at row 1
 -- Measured, not inferred. So RadioDJ simply cannot save an SQL,
@@ -208,7 +208,7 @@ PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 -- no bad rows to find, because there are no rows.
 --
 -- And the scheduler resolves entry type with `IF(rl.catID < 0, ...)`,
--- a test that is unreachable on an unsigned column — so an entry that
+-- a test that is unreachable on an unsigned column - so an entry that
 -- did somehow land would be built as a real subcategory with subID 0,
 -- matching nothing, and the slot would silently never fill.
 --
@@ -233,7 +233,7 @@ PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
 
 -- =====================================================================
--- 5. FIX 4 — playlists_list.sID signedness
+-- 5. FIX 4 - playlists_list.sID signedness
 --
 -- `int unsigned` on some stations, `int` on others. Cosmetic: song IDs
 -- are always positive and nothing writes a negative one. Aligned only
@@ -250,14 +250,14 @@ PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
 
 -- =====================================================================
--- 6. FIX 5 — songs.lang default
+-- 6. FIX 5 - songs.lang default
 --
 -- 'Not Set' on some stations, 'und' on others. RadioDJ writes 'und'
 -- (ISO 639-2 for undetermined) for a track with no language tag, and
 -- 'und' is the value our library tooling treats as the sentinel.
 --
 -- Affects only rows inserted from now on. Existing rows are left
--- alone deliberately — a blanket UPDATE would overwrite real language
+-- alone deliberately - a blanket UPDATE would overwrite real language
 -- tags on stations where language is actually curated.
 -- =====================================================================
 
@@ -270,7 +270,7 @@ PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
 
 -- =====================================================================
--- 9. VERIFY — read this. All five must say OK.
+-- 9. VERIFY - read this. All five must say OK.
 -- =====================================================================
 
 SELECT 'fix 1  db default collation' AS fix,
@@ -339,7 +339,7 @@ SELECT 'fix 5  songs.lang default',
 --
 --   fix 1  ALTER DATABASE <station> CHARACTER SET utf8mb4
 --              COLLATE utf8mb4_0900_ai_ci;
---   fix 2  MODIFY the 8 columns back to varchar(200) — ONLY if no row
+--   fix 2  MODIFY the 8 columns back to varchar(200) - ONLY if no row
 --          now exceeds 200 chars, because narrowing truncates silently
 --          in non-strict mode and errors in strict mode. Check with
 --          the section 1 query first.

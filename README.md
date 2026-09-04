@@ -6,7 +6,7 @@ RadioDJ can rotate categories. It cannot say *"this hour, on this weekday, has
 this shape"*, and it cannot build tomorrow's log in advance so you can look at it
 before it airs. This adds both, in SQL, inside your existing RadioDJ database.
 
-It does not replace RadioDJ's rotations — it uses them. You still design the
+It does not replace RadioDJ's rotations - it uses them. You still design the
 shape of an hour in RadioDJ's rotation editor. This decides which hour of which
 weekday gets which shape, picks the actual tracks a day ahead, and hands each
 hour to RadioDJ through a playlist.
@@ -17,14 +17,14 @@ hour to RadioDJ through a playlist.
 
 | | |
 |---|---|
-| **Version** | 1.0.0 — an installed database reports its own with `SELECT version FROM scheduler_config WHERE ID = 1;` |
+| **Version** | 1.0.0 - an installed database reports its own with `SELECT version FROM scheduler_config WHERE ID = 1;` |
 | **RadioDJ** | 3.0.0.2 |
-| **Database** | MySQL 8.0.x — tested on 8.0.45. **Not MariaDB** (see [Requirements](#requirements)) |
+| **Database** | MySQL 8.0.x - tested on 8.0.45. **Not MariaDB** (see [Requirements](#requirements)) |
 | **Licence** | [MIT](LICENSE) |
 | **In production on** | Radio Nemiers · Nemiers Lite · Nemiers GFT · Radio Liepāja |
 
 Four stations run this daily. It has still never seen *your* station.
-**Test it off-air first** — [INSTALL.md](INSTALL.md) Step 0
+**Test it off-air first** - [INSTALL.md](INSTALL.md) Step 0
 explains how, and it costs about an hour.
 
 ---
@@ -56,8 +56,8 @@ that need more than that.
 |---|---|
 | **[`INSTALL.md`](INSTALL.md)** | **The guided install.** Start here. Also the day-to-day reference, the technical notes and the troubleshooting table. |
 | [`radiodj-schema-fixes.sql`](radiodj-schema-fixes.sql) | Five fixes to **RadioDJ's own schema**, not to anything here. Run it first, and again after every RadioDJ upgrade. |
-| [`scheduler-create.sql`](scheduler-create.sql) | The scheduler itself: 11 tables, 14 routines, 3 events, 3 columns added to RadioDJ's `subcategory`, and one trigger on RadioDJ's `songs` — [see below](#new-tracks-and-the-songs-trigger). Fresh install, not re-runnable. |
-| [`scheduler-remove.sql`](scheduler-remove.sql) | Complete removal. Takes your clocks, grid and built days with it — that is what removal means. |
+| [`scheduler-create.sql`](scheduler-create.sql) | The scheduler itself: 11 tables, 14 routines, 3 events, 3 columns added to RadioDJ's `subcategory`, and one trigger on RadioDJ's `songs` - [see below](#new-tracks-and-the-songs-trigger). Fresh install, not re-runnable. |
+| [`scheduler-remove.sql`](scheduler-remove.sql) | Complete removal. Takes your clocks, grid and built days with it - that is what removal means. |
 
 All three SQL files contain no `USE` statement and no database name. Select your database in
 HeidiSQL first; the same files then work on any station.
@@ -72,11 +72,11 @@ this scheduler:
 1. The database's default collation does not match its own tables, so any table
    added later throws *Illegal mix of collations* on its first text join.
 2. `history` truncates artist and title at 200 characters while `songs` allows
-   250 — long titles are silently cut on the way into your play history.
+   250 - long titles are silently cut on the way into your play history.
 3. **`rotations_list` stores three columns as `UNSIGNED` that RadioDJ writes
    negative values into.** On such a station RadioDJ *cannot save* a rotation
    rule containing an SQL query, a manual event or a listener request. Under
-   MySQL's default strict mode the write fails outright — you may have hit this
+   MySQL's default strict mode the write fails outright - you may have hit this
    and never worked out why.
 4. A signedness mismatch in `playlists_list`.
 5. `songs.lang` defaults to the wrong sentinel.
@@ -105,6 +105,9 @@ schedule                      The materialised day: one row per slot,
                               with the chosen track.
    |
 playlists_list                The next hour, handed to RadioDJ.
+   |
+RadioDJ event "Schedule"      Clears and reloads that playlist, hourly.
+   (built in RadioDJ's UI)     You create this one yourself - Step 9.
 ```
 
 You need **one clock per distinct shape of hour**, not 24. Many stations need
@@ -116,14 +119,14 @@ Five layers, **first match wins**. Most stations only ever use the last one.
 
 | Priority | Source | Scope | For |
 |---|---|---|---|
-| 1 | `clock_overrides` | one hour | A single show — weekly, every *n*th week, *n*th weekday of the month, or a one-off date |
+| 1 | `clock_overrides` | one hour | A single show - weekly, every *n*th week, *n*th weekday of the month, or a one-off date |
 | 2 | `clock_grid_schedule` | whole day | A holiday, pinned to a date |
 | 3 | `clock_grid_monthly_rules` | whole day | "First Saturday of the month" |
 | 4 | `clock_grid_rotations` | whole week | Two or more layouts alternating week by week |
 | 5 | `clock_grids.is_default` | always | **The normal week. This is all you need to start.** |
 
 `CALL ClockGridExplain('2026-12-24')` returns 24 rows for one date naming which
-layer decided each hour. Run it after every change — with five overlapping
+layer decided each hour. Run it after every change - with five overlapping
 layers, *"why is Tuesday showing that clock?"* is the question you will actually
 have, and this answers it.
 
@@ -131,7 +134,7 @@ have, and this answers it.
 
 A grid can name another as its `feeder_grid_id`. Any hour it does not define is
 taken from the feeder. So a Christmas grid defines the six hours that differ and
-inherits the other 162 — rather than being a 168-cell copy that drifts out of
+inherits the other 162 - rather than being a 168-cell copy that drifts out of
 sync with your normal week every time you change it.
 
 ### The nightly chain
@@ -143,8 +146,21 @@ sync with your normal week every time you change it.
 | `hh:59` | Push the next hour into the playlist RadioDJ loads. |
 
 None of it runs unless MySQL's event scheduler is on, and **it is off by default
-after every MySQL restart, silently.** [INSTALL.md](INSTALL.md) Step 9 covers
+after every MySQL restart, silently.** [INSTALL.md](INSTALL.md) Step 10 covers
 making that survive a reboot.
+
+### The handoff to RadioDJ
+
+The scheduler fills a playlist. It does not play it. **You have to create one
+event inside RadioDJ** that clears the playlist, loads the one the scheduler
+fills, and does it every hour of every day. Without it the whole chain above
+runs correctly and nothing reaches the air.
+
+It has to be built in RadioDJ's own events window, not with SQL: RadioDJ reads
+the `events` table into memory once and only re-reads it when you open that
+window, so an event inserted with SQL sits there looking right and never fires.
+[INSTALL.md](INSTALL.md) Step 9 is the field-by-field walkthrough, including the
+action order, which matters more than it looks like it should.
 
 ### New tracks and the `songs` trigger
 
@@ -152,7 +168,7 @@ making that survive a reboot.
 `songs` table. It is the only thing here that writes to a RadioDJ table, and it
 exists to stop a library import from emptying itself onto the air in one go.
 
-RadioDJ stamps every new track with `date_played = '2002-01-01 00:00:01'` — the
+RadioDJ stamps every new track with `date_played = '2002-01-01 00:00:01'` - the
 never-played sentinel. Both RadioDJ's rotations and this scheduler pick the
 **least recently played** eligible track, and 2002 is older than anything real
 in your library. So every track you import is simultaneously the most overdue
@@ -170,8 +186,8 @@ END IF;
 ```
 
 New tracks then enter the rotation spread across the pool instead of stacked at
-the front of it. It fires only on the sentinel — a row that arrives with a real
-date is left alone — and only on `INSERT`, so it never rewrites play history.
+the front of it. It fires only on the sentinel - a row that arrives with a real
+date is left alone - and only on `INSERT`, so it never rewrites play history.
 
 **The trade-off, so it does not surprise you later:** after an import, nothing in
 your library reads as never-played. A query looking for the sentinel finds
@@ -190,7 +206,7 @@ Nothing else depends on it. `scheduler-remove.sql` drops it for you.
 
 **Never remove the default from `subcategory.average_runtime`.** This scheduler
 adds three columns to RadioDJ's `subcategory` table. RadioDJ does not know they
-exist, so it does not supply values when you add a subcategory in its UI — and
+exist, so it does not supply values when you add a subcategory in its UI - and
 if MySQL rejects that insert because a `NOT NULL` column has no default,
 **RadioDJ shows no error at all.** You click "add subcategory", nothing happens,
 and nothing anywhere tells you why. You would be hunting a bug in RadioDJ, over
@@ -205,8 +221,8 @@ When they diverge, the scheduler fills playlist A, RadioDJ loads playlist B, and
 check it again any time you edit events in RadioDJ.
 
 **Set `fill_priority` if any subcategory is small.** The fill walks slots in
-`subcategory.fill_priority ASC` order — lower number gets first pick of the
-library — and every track it takes becomes unavailable to later slots for the
+`subcategory.fill_priority ASC` order - lower number gets first pick of the
+library - and every track it takes becomes unavailable to later slots for the
 length of the separation window. A subcategory with 400 tracks can afford to
 pick last. One with 12 cannot: by the time its turn comes, separation may rule
 out every track it is allowed to use, and the slot comes out **empty even though
@@ -235,7 +251,7 @@ WHERE ID = <the starved one>;
   8.4 because 8.0 is what these stations run.
 - **HeidiSQL**, or any client that understands the `DELIMITER` directive.
   `scheduler-create.sql` defines stored routines, and `DELIMITER` is a
-  *client-side* instruction — send it to MySQL from a driver or a script and it
+  *client-side* instruction - send it to MySQL from a driver or a script and it
   fails on the first line. Run these files from HeidiSQL.
 - At least one rotation already built in RadioDJ, with real audio behind it.
 
@@ -256,7 +272,7 @@ In plainer terms:
   nothing at all.
 - It does not modify or delete your audio files, and it does not delete rows from
   `songs`. It does install one trigger that sets `date_played` and `title_played`
-  on tracks **as they are inserted** — [why](#new-tracks-and-the-songs-trigger).
+  on tracks **as they are inserted** - [why](#new-tracks-and-the-songs-trigger).
   It never rewrites an existing row.
 - Nobody is on call for your transmitter.
 
@@ -264,12 +280,12 @@ In plainer terms:
 
 ## Author
 
-Built by **Aigars Sukurs** — self-taught radio engineer. Five stations built so
+Built by **Aigars Sukurs** - self-taught radio engineer. Five stations built so
 far: Radio 101, Rīga Radio, Latvijas Radio 5, [Radio Nemiers](https://radionemiers.com/)
 and Radio Liepāja.
 
 This scheduler came out of needing it for the three Nemiers stations, and then
-needing the same thing again for Radio Liepāja — which is why it keys everything
+needing the same thing again for Radio Liepāja - which is why it keys everything
 on the selected database and holds each station's own values in one config row,
 rather than being four copies that drift apart.
 
@@ -295,5 +311,5 @@ to accept:
   these files are mostly the record of something that failed in production once.
   A few of them are the only reason the same thing has not happened twice.
 
-If you hit something these files do not explain, open an issue — the gap in the
+If you hit something these files do not explain, open an issue - the gap in the
 documentation is usually the actual bug.
