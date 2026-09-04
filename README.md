@@ -156,6 +156,10 @@ event inside RadioDJ** that clears the playlist, loads the one the scheduler
 fills, and does it every hour of every day. Without it the whole chain above
 runs correctly and nothing reaches the air.
 
+That same event should also load a rotation as a fallback. If the playlist ever
+arrives empty - a failed build, the event scheduler off after a MySQL restart -
+AutoDJ then has something to reach for instead of putting out silence.
+
 It has to be built in RadioDJ's own events window, not with SQL: RadioDJ reads
 the `events` table into memory once and only re-reads it when you open that
 window, so an event inserted with SQL sits there looking right and never fires.

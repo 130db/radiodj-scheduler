@@ -647,22 +647,35 @@ In RadioDJ, open the events window and add a new event:
 | Days | **all seven ticked** |
 | Hours | **all 24 ticked** |
 
-Then add four actions, **in this order**:
+Then add five actions, **in this order**:
 
 ```
 1  AutoDJ Disable!
 2  Clear Playlist!
 3  Load Playlist|0|<YOUR PLAYLIST ID>|<name>|Top
-4  AutoDJ Enable!
+4  Load Rotation|<ROTATION ID>|<name>
+5  AutoDJ Enable!
 ```
 
-Action 3 is the one you configure - pick the playlist you chose in
-[4b](#4b---your-playlists) and insert at `Top`. The other three are literal.
+Actions 3 and 4 are the ones you configure. Action 3 is the playlist you chose
+in [4b](#4b---your-playlists), inserted at `Top`. The other three are literal.
+
+**Action 4 is your safety net, and it is worth having.** Loading a rotation
+alongside the playlist means that if the playlist arrives empty for any reason -
+a build that failed, the event scheduler switched off after a MySQL restart, a
+starved subcategory leaving holes - AutoDJ has something to fall back on and the
+station keeps talking. Without it, an empty playlist is silence. Point it at
+whatever rotation you would want on air if you were not there.
+
+If you want the fallback to match the hour rather than be one blanket rotation,
+build it as separate per-hour events instead, each with its own
+`Load Rotation` and its hours ticked accordingly. That is more events to
+maintain, and one rotation covers most stations.
 
 **The order is the point.** `Clear Playlist!` before the load is what stops the
 playlist growing by an hour every hour. The `AutoDJ Disable!` / `AutoDJ Enable!`
-pair around it stops RadioDJ reaching for a rotation during the moment the
-playlist is empty mid-swap.
+pair around the whole group stops RadioDJ reaching for anything during the
+moment the playlist is empty mid-swap.
 
 Save the event. Now check that what RadioDJ stored agrees with what the
 scheduler fills - `verdict` must say `AGREES`:
