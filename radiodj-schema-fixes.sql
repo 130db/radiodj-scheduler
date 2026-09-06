@@ -281,8 +281,14 @@ PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 -- either a sentinel in `sID` — this fix — or it lands in `rotations_list` and
 -- FIX 3 already covers it.
 --
--- Either way, apply it BEFORE building playlists. A row that could not be
--- written is not recovered by widening the column afterwards.
+-- Apply it BEFORE building playlists, because the change repairs future
+-- writes and not past ones. An entry that failed to save was never stored,
+-- so there is nothing to recover afterwards — it has to be added again.
+--
+-- Note this is not a widening. Both types are 32 bits; the range moves
+-- rather than grows, from 0…4294967295 to −2147483648…2147483647. The
+-- positive half is halved, which is harmless here because no table in
+-- RadioDJ approaches two billion rows.
 -- =====================================================================
 
 SET @sql := IF((SELECT COLUMN_TYPE FROM information_schema.COLUMNS
