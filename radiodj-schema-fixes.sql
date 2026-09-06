@@ -197,7 +197,10 @@ PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 --     -10    a manual event      (events.ID lives in subID)
 --     -100   a listener request
 --
--- and the row then carries the SAME sentinel in subID AND genID.
+-- What subID and genID then hold depends on WHICH sentinel. Checked
+-- against live rows: -50 and -100 repeat it in all three columns, while
+-- -10 puts the EVENT ID in subID and genID (catID -10, subID 34,
+-- genID 34). So "is this special" is a question about catID alone.
 --
 -- On an unsigned column under STRICT_TRANS_TABLES - which is the MySQL
 -- 8 default and what production runs - the write does not clamp, it
@@ -235,10 +238,36 @@ PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 -- =====================================================================
 -- 5. FIX 4 - playlists_list.sID signedness
 --
--- `int unsigned` on some stations, `int` on others. Cosmetic: song IDs
--- are always positive and nothing writes a negative one. Aligned only
--- so a schema diff between two stations comes back empty and therefore
--- stays worth running.
+-- `int unsigned` on some stations, `int` on others. NOT cosmetic: verified
+-- against live Radio Nemiers rows on 2026-09-06, where `playlists_list`
+-- holds `sID = -100` on entries that are not songs — the row's `swID`
+-- names a sweeper instead. So a playlist with anything but plain tracks in
+-- it cannot be saved on a station where this column is unsigned.
+--
+-- The values are NOT the same as `rotations_list`'s. Both tables hold
+-- manual events and both use negative markers, and they do not agree on
+-- what the numbers mean — do not carry an assumption from one to the other.
+--
+-- It is the same FAMILY as FIX 3 above, which is where the sentinel model and
+-- the measured failure are documented. Do not re-derive them here. If RadioDJ
+-- ever stores a negative marker in `sID` — the way `rotations_list` stores -10
+-- for a manual event — then this column has the same defect and the same cure.
+--
+-- The failure needs no station data to confirm. Two tables and one INSERT show
+-- it, under the MySQL 8 default mode that production runs:
+--
+--     CREATE TABLE u (catID int unsigned NOT NULL);
+--     CREATE TABLE s (catID int NOT NULL);
+--     INSERT INTO u VALUES (-10);   -- ERROR 1264 Out of range value
+--     INSERT INTO s VALUES (-10);   -- fine
+--
+-- What is still open is only WHICH column RadioDJ writes when a manual event
+-- goes into a playlist. Nothing links `playlists_list` to `events`, so it is
+-- either a sentinel in `sID` — this fix — or it lands in `rotations_list` and
+-- FIX 3 already covers it.
+--
+-- Either way, apply it BEFORE building playlists. A row that could not be
+-- written is not recovered by widening the column afterwards.
 -- =====================================================================
 
 SET @sql := IF((SELECT COLUMN_TYPE FROM information_schema.COLUMNS
