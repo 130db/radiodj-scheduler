@@ -198,9 +198,10 @@ PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 --     -100   a listener request
 --
 -- What subID and genID then hold depends on WHICH sentinel. Checked
--- against live rows: -50 and -100 repeat it in all three columns, while
--- -10 puts the EVENT ID in subID and genID (catID -10, subID 34,
--- genID 34). So "is this special" is a question about catID alone.
+-- against live rows: -50 and -100 repeat the same value in catID, subID
+-- and genID, while -10 puts the EVENT ID in subID and genID instead
+-- (catID -10, subID 34, genID 34). So "is this special" is a question
+-- about catID alone.
 --
 -- On an unsigned column under STRICT_TRANS_TABLES - which is the MySQL
 -- 8 default and what production runs - the write does not clamp, it
@@ -247,9 +248,11 @@ PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 --     sID = -100   the entry is a manual event
 --     swID         holds the events.ID
 --
--- So a playlist containing a manual event cannot be saved on a station
--- where `sID` is unsigned. Which is the reported RadioDJ 3 symptom: add a
--- manual event to a playlist, save without complaint, reopen, it is gone.
+-- So a playlist containing a manual event cannot be saved on a station where
+-- `sID` is unsigned - the same ERROR 1264 write failure as FIX 3, invisible
+-- here only because RadioDJ does not show the database error to the operator.
+-- The reported RadioDJ 3 symptom: add a manual event to a playlist, save, see
+-- no error, reopen the playlist, the event is gone.
 --
 -- ==> THE TRAP: BOTH TABLES CARRY MANUAL EVENTS AND THEY DISAGREE. <==
 --
@@ -257,38 +260,18 @@ PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 --     rotations_list    catID = -10     subID (and genID)
 --     playlists_list    sID   = -100    swID
 --
--- and -100 in `rotations_list` is a listener REQUEST, not an event at all.
--- Reading the numbers instead of the table is how you conclude that a
--- playlist's manual event must be -10, or that -100 means the same thing in
--- both places. It does not. The same two events, 34 and 35, appear under
--- BOTH markers on this station.
+-- and -100 in `rotations_list` marks a listener REQUEST, not an event at all.
+-- Do not assume -100 means the same thing in both tables, or that a manual
+-- event is always marked -10 - neither is true. On this station, the same
+-- two events, 34 and 35, appear under BOTH markers.
 --
--- It is the same FAMILY as FIX 3 above, which is where the sentinel model and
--- the measured failure are documented. Do not re-derive them here. If RadioDJ
--- ever stores a negative marker in `sID` — the way `rotations_list` stores -10
--- for a manual event — then this column has the same defect and the same cure.
+-- Same family as FIX 3, same cure: the sentinel model and the
+-- STRICT_TRANS_TABLES failure are explained there once - read them there
+-- rather than again here.
 --
--- The failure needs no station data to confirm. Two tables and one INSERT show
--- it, under the MySQL 8 default mode that production runs:
---
---     CREATE TABLE u (catID int unsigned NOT NULL);
---     CREATE TABLE s (catID int NOT NULL);
---     INSERT INTO u VALUES (-10);   -- ERROR 1264 Out of range value
---     INSERT INTO s VALUES (-10);   -- fine
---
--- What is still open is only WHICH column RadioDJ writes when a manual event
--- goes into a playlist. Nothing links `playlists_list` to `events`, so it is
--- either a sentinel in `sID` — this fix — or it lands in `rotations_list` and
--- FIX 3 already covers it.
---
--- Apply it BEFORE building playlists, because the change repairs future
--- writes and not past ones. An entry that failed to save was never stored,
--- so there is nothing to recover afterwards — it has to be added again.
---
--- Note this is not a widening. Both types are 32 bits; the range moves
--- rather than grows, from 0…4294967295 to −2147483648…2147483647. The
--- positive half is halved, which is harmless here because no table in
--- RadioDJ approaches two billion rows.
+-- Apply this BEFORE building playlists. The change repairs future writes
+-- only; an entry that failed to save was never stored, so there is nothing
+-- to recover afterwards - it has to be added again.
 -- =====================================================================
 
 SET @sql := IF((SELECT COLUMN_TYPE FROM information_schema.COLUMNS
