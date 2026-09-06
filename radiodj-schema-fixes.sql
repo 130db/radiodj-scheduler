@@ -238,15 +238,30 @@ PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 -- =====================================================================
 -- 5. FIX 4 - playlists_list.sID signedness
 --
--- `int unsigned` on some stations, `int` on others. NOT cosmetic: verified
--- against live Radio Nemiers rows on 2026-09-06, where `playlists_list`
--- holds `sID = -100` on entries that are not songs — the row's `swID`
--- names a sweeper instead. So a playlist with anything but plain tracks in
--- it cannot be saved on a station where this column is unsigned.
+-- `int unsigned` on some stations, `int` on others. NOT cosmetic.
 --
--- The values are NOT the same as `rotations_list`'s. Both tables hold
--- manual events and both use negative markers, and they do not agree on
--- what the numbers mean — do not carry an assumption from one to the other.
+-- Besides songs, a playlist holds MANUAL EVENTS, and that is what the
+-- negative marker is for. Verified against live Radio Nemiers rows on
+-- 2026-09-06:
+--
+--     sID = -100   the entry is a manual event
+--     swID         holds the events.ID
+--
+-- So a playlist containing a manual event cannot be saved on a station
+-- where `sID` is unsigned. Which is the reported RadioDJ 3 symptom: add a
+-- manual event to a playlist, save without complaint, reopen, it is gone.
+--
+-- ==> THE TRAP: BOTH TABLES CARRY MANUAL EVENTS AND THEY DISAGREE. <==
+--
+--                       marker          events.ID lives in
+--     rotations_list    catID = -10     subID (and genID)
+--     playlists_list    sID   = -100    swID
+--
+-- and -100 in `rotations_list` is a listener REQUEST, not an event at all.
+-- Reading the numbers instead of the table is how you conclude that a
+-- playlist's manual event must be -10, or that -100 means the same thing in
+-- both places. It does not. The same two events, 34 and 35, appear under
+-- BOTH markers on this station.
 --
 -- It is the same FAMILY as FIX 3 above, which is where the sentinel model and
 -- the measured failure are documented. Do not re-derive them here. If RadioDJ
