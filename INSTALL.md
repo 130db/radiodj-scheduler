@@ -47,9 +47,9 @@ This adds both: a weekly clock grid, and a materialised schedule built a day
 ahead.
 
 **What it does not do.** It does not replace RadioDJ's own rotations - it *uses*
-them. You still design the shape of an hour in RadioDJ's rotation editor. This
-decides which hour gets which shape, and picks the actual tracks a day in
-advance. It does not touch your audio files and it does not delete tracks.
+them. You still design the shape of an hour in RadioDJ's rotation editor; this
+scheduler decides which hour gets which shape, and picks the actual tracks a
+day in advance. It does not touch your audio files and it does not delete tracks.
 
 ---
 
@@ -192,11 +192,24 @@ they bite whether you install it or not:
    *negative* values into.** On such a station RadioDJ **cannot save** a rotation
    rule that contains an SQL query, a manual event or a listener request. It
    fails, and you may never have worked out why.
-4. A signedness mismatch in `playlists_list`.
+4. **The same defect in `playlists_list.sID`.** A playlist can hold a manual
+   event as well as songs, marked the same way - a negative sentinel in a
+   column RadioDJ declared `UNSIGNED`. A playlist containing one cannot be
+   saved until this fix runs.
 5. `songs.lang` defaults to the wrong sentinel.
 
-**Fix 3 is the one to care about, and this scheduler depends on it** - without
-it, special rotation entries can never work.
+**Fixes 3 and 4 are the ones to care about, and this scheduler depends on
+them** - without them, special rotation entries and manual events in
+playlists can never be saved.
+
+**If you already run this station, you may be looking at the result right
+now.** Both defects fail silently - RadioDJ shows no error, the entry is
+simply never written. If you have ever added an SQL-query or listener-request
+rotation rule, a manual event inside a rotation, or a manual event inside a
+playlist, and it didn't stick, this is why. There is nothing to migrate: a
+write that failed left no row behind to recover. Run this fix, then check
+your rotations and playlists against what you remember building, and re-add
+whatever is missing by hand.
 
 The file is safe to re-run and prints `OK` or `FAILED` for each fix. **Re-run it
 after every RadioDJ upgrade** - a RadioDJ update can quietly put any of the five
@@ -553,7 +566,7 @@ and so the automatic nightly build does not overwrite it while you are looking.
 
 > **Never build a date in the past.** The track picker needs *"this track was
 > last played more than N hours before this slot"* to be true, and for a past
-> date that is never true. It fills nothing and reports success.
+> date that is never true. It completes without error and fills nothing.
 
 ```sql
 SET @d := CURDATE() + INTERVAL 3 DAY;
@@ -721,6 +734,12 @@ Two events do the work from here, plus one that pushes each hour to air:
 
 **None of them run unless MySQL's event scheduler is on, and it is off by default
 after every MySQL restart, silently.**
+
+**This is a server setting, not a per-database one.** If this MySQL instance
+hosts more than one station, turning it on here activates every station's
+scheduler events at once - including one that hasn't reached Step 4 yet,
+which will just log `scheduler_config row 1 is missing` harmlessly until it
+does.
 
 ```sql
 SHOW VARIABLES LIKE 'event_scheduler';
@@ -1006,9 +1025,17 @@ teardown.
 
 ### Negative IDs are meaningful
 
-In `rotations_list`, `catID` of `-50` means "an SQL query", `-10` "a manual
-event", `-100` "a listener request", and the row carries the same sentinel in
-`subID` and `genID`. This is why fix 3 in `radiodj-schema-fixes.sql` matters.
+In `rotations_list`, `catID` of `-50` means "an SQL query" and `-100` "a
+listener request" - both repeat the same value into `subID` and `genID`.
+`-10` means "a manual event", but here `subID` and `genID` hold the
+`events.ID` instead, not the sentinel. This is why fix 3 in
+`radiodj-schema-fixes.sql` matters.
+
+**`playlists_list` uses the same trick with a different number.** A manual
+event inside a playlist is marked `sID = -100`, with the event's ID in
+`swID` - and `-100` here means "manual event", not "listener request" the
+way it does in `rotations_list`. Read the table you're looking at, not the
+number alone. This is fix 4.
 
 ### The playlist ID is stored twice
 

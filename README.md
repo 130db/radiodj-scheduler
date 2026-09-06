@@ -7,9 +7,9 @@ this shape"*, and it cannot build tomorrow's log in advance so you can look at i
 before it airs. This adds both, in SQL, inside your existing RadioDJ database.
 
 It does not replace RadioDJ's rotations - it uses them. You still design the
-shape of an hour in RadioDJ's rotation editor. This decides which hour of which
-weekday gets which shape, picks the actual tracks a day ahead, and hands each
-hour to RadioDJ through a playlist.
+shape of an hour in RadioDJ's rotation editor; this scheduler decides which
+hour of which weekday gets which shape, picks the actual tracks a day ahead,
+and hands each hour to RadioDJ through a playlist.
 
 ---
 
@@ -169,40 +169,16 @@ action order, which matters more than it looks like it should.
 ### New tracks and the `songs` trigger
 
 `scheduler-create.sql` installs one trigger, `SongsInsert`, on RadioDJ's own
-`songs` table. It is the only thing here that writes to a RadioDJ table, and it
-exists to stop a library import from emptying itself onto the air in one go.
+`songs` table - the only thing here that writes to a RadioDJ table.
 
-RadioDJ stamps every new track with `date_played = '2002-01-01 00:00:01'` - the
-never-played sentinel. Both RadioDJ's rotations and this scheduler pick the
-**least recently played** eligible track, and 2002 is older than anything real
-in your library. So every track you import is simultaneously the most overdue
-track you own. Import 300 and the next few hours are those 300, back to back, in
-import order, while the rest of the library goes silent. The same applies to
-`title_played` and title separation.
+RadioDJ stamps every new track as never-played, which makes it the single
+most overdue track in your library the moment it's imported. Import 300
+tracks and the next few hours are those 300, back to back, while the rest of
+the library falls silent. The trigger fixes this by scattering new tracks'
+play timestamps across the last 8 hours instead, at insert time only.
 
-The trigger replaces that sentinel, at insert time, with a random moment in the
-**last 8 hours**:
-
-```sql
-IF NEW.date_played = '2002-01-01 00:00:01' THEN
-    SET NEW.date_played = DATE_SUB(NOW(), INTERVAL FLOOR(RAND() * 28800) SECOND);
-END IF;
-```
-
-New tracks then enter the rotation spread across the pool instead of stacked at
-the front of it. It fires only on the sentinel - a row that arrives with a real
-date is left alone - and only on `INSERT`, so it never rewrites play history.
-
-**The trade-off, so it does not surprise you later:** after an import, nothing in
-your library reads as never-played. A query looking for the sentinel finds
-nothing, and "tracks that have never aired" is not a question you can ask of the
-database any more. If you would rather have the flood than lose the sentinel:
-
-```sql
-DROP TRIGGER IF EXISTS `SongsInsert`;
-```
-
-Nothing else depends on it. `scheduler-remove.sql` drops it for you.
+Full explanation, the trade-off, and how to drop it if you'd rather not have
+it: [INSTALL.md § The songs trigger](INSTALL.md#the-songs-trigger).
 
 ---
 
